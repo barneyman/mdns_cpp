@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "mdns_cpp/defs.hpp"
 
@@ -23,7 +24,7 @@ class mDNS {
   void setServiceName(const std::string &name);
   void setServiceTxtRecord(const std::string &text_record);
 
-  void executeQuery(const std::string &service);
+  void executeQuery(const std::string &service, std::vector<std::string> &arecords);
   void executeDiscovery();
 
  private:
@@ -45,6 +46,15 @@ class mDNS {
   uint8_t service_address_ipv6_[16]{0};
 
   std::thread worker_thread_;
+
+public:
+
+  virtual void a_record(const std::string &newArecord);
+  
+protected:
+
+  std::vector<std::string> m_arecords;
+
 };
 
 }  // namespace mdns_cpp

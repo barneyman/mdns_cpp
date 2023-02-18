@@ -255,6 +255,8 @@ static int query_callback(int sock, const struct sockaddr *from, size_t addrlen,
   (void)sizeof(name_length);
   (void)sizeof(user_data);
 
+  mDNS *me=(mDNS*)user_data;
+
   static char addrbuffer[64]{};
   static char namebuffer[256]{};
   static char entrybuffer[256]{};
@@ -283,6 +285,10 @@ static int query_callback(int sock, const struct sockaddr *from, size_t addrlen,
     mdns_record_parse_a(data, size, record_offset, record_length, &addr);
     const auto addrstr = ipv4AddressToString(namebuffer, sizeof(namebuffer), &addr, sizeof(addr));
     snprintf(str_buffer, str_capacity,"%s : %s %.*s A %s\n", fromaddrstr.data(), entrytype, MDNS_STRING_FORMAT(entrystr), addrstr.data());
+    if(me)
+    {
+      me->a_record(addrstr);
+    }
   } else if (rtype == MDNS_RECORDTYPE_AAAA) {
     struct sockaddr_in6 addr;
     mdns_record_parse_aaaa(data, size, record_offset, record_length, &addr);
@@ -455,7 +461,7 @@ void mDNS::runMainLoop() {
   MDNS_LOG << "Closed socket " << (num_sockets ? "s" : "") << "\n";
 }
 
-void mDNS::executeQuery(const std::string &service) {
+void mDNS::executeQuery(const std::string &service, std::vector<std::string> &a_records) {
   int sockets[32];
   int query_id[32];
   int num_sockets = openClientSockets(sockets, sizeof(sockets) / sizeof(sockets[0]), 0);
@@ -469,8 +475,10 @@ void mDNS::executeQuery(const std::string &service) {
 
   size_t capacity = 2048;
   void *buffer = malloc(capacity);
-  void *user_data = 0;
+  void *user_data = this;
   size_t records;
+
+  m_arecords.clear();
 
   MDNS_LOG << "Sending mDNS query: " << service << "\n";
   for (int isock = 0; isock < num_sockets; ++isock) {
@@ -485,7 +493,7 @@ void mDNS::executeQuery(const std::string &service) {
   // get replies
   int res{};
   MDNS_LOG << "Reading mDNS query replies\n";
-  do {
+  {
     struct timeval timeout;
     timeout.tv_sec = 5;
     timeout.tv_usec = 0;
@@ -508,7 +516,7 @@ void mDNS::executeQuery(const std::string &service) {
         FD_SET(sockets[isock], &readfs);
       }
     }
-  } while (res > 0);
+  } 
 
   free(buffer);
 
@@ -516,6 +524,8 @@ void mDNS::executeQuery(const std::string &service) {
     mdns_socket_close(sockets[isock]);
   }
   MDNS_LOG << "Closed socket" << (num_sockets ? "s" : "") << "\n";
+
+  a_records=m_arecords;
 }
 
 void mDNS::executeDiscovery() {
@@ -574,6 +584,14 @@ void mDNS::executeDiscovery() {
     mdns_socket_close(sockets[isock]);
   }
   MDNS_LOG << "Closed socket" << (num_sockets ? "s" : "") << "\n";
+}
+
+void mDNS::a_record(const std::string &newArecord)
+{
+  if(std::find(m_arecords.begin(), m_arecords.end(), newArecord) == m_arecords.end())
+  {
+    m_arecords.push_back(newArecord);
+  }
 }
 
 }  // namespace mdns_cpp
