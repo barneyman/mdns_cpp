@@ -493,6 +493,7 @@ void mDNS::executeQuery(const std::string &service, std::vector<std::string> &a_
   // get replies
   int res{};
   MDNS_LOG << "Reading mDNS query replies\n";
+  for(int each=0;each<3;each++)
   {
     struct timeval timeout;
     timeout.tv_sec = 5;
